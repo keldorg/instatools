@@ -1,8 +1,31 @@
 'use strict'
 
+import path from 'path'
+import mkdirp from 'mkdirp'
+import fs from 'fs'
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { likeUserListFirstPost, getUserFollowers } from './logic/instagram'
 import Instagram from './components/Instagram'
+
+var deleteFolderRecursive = function (path) {
+  if (fs.existsSync(path)) {
+    fs.readdirSync(path).forEach(function (file, index) {
+      var curPath = path + '/' + file
+      if (fs.lstatSync(curPath).isDirectory()) { // recurse
+        deleteFolderRecursive(curPath)
+      } else { // delete file
+        fs.unlinkSync(curPath)
+      }
+    })
+    fs.rmdirSync(path)
+  }
+}
+
+deleteFolderRecursive(path.resolve() + '/cookies')
+deleteFolderRecursive(path.resolve() + '/tmp')
+
+mkdirp.sync(path.resolve() + '/cookies')
+mkdirp.sync(path.resolve() + '/tmp')
 
 const insta = new Instagram()
 
@@ -69,7 +92,7 @@ ipcMain.on('login', function (event, data) {
 
 ipcMain.on('likeUserListFirstPost', function (event, data) {
   if (insta.isLogged()) {
-    likeUserListFirstPost(data, insta, mainWindow);
+    likeUserListFirstPost(data, insta, mainWindow)
   }
 })
 

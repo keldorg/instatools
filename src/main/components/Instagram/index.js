@@ -1,5 +1,7 @@
 import axios from 'axios'
+import path from 'path'
 import request from 'request-promise'
+let Client = require('instagram-private-api').V1
 
 class Instagram {
   constructor () {
@@ -8,14 +10,22 @@ class Instagram {
       'accept': '*/*',
       'accept-language': 'es-ES,es;q=0.9',
       'accept-encoding': 'gzip, deflate, br',
+      'content-length': '0',
       'connection': 'keep-alive',
       'host': 'www.instagram.com',
       'origin': 'https://www.instagram.com',
       'referer': 'https://www.instagram.com/',
       'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/63.0.3239.84 Chrome/63.0.3239.84 Safari/537.36',
-      'upgrade-insecure-requests': '1',
-      'content-type': 'application/x-www-form-urlencoded'
+      'content-type': 'application/x-www-form-urlencoded',
+      'x-instagram-ajax': '1',
+      'x-requested-with': 'XMLHttpRequest'
     }
+    this.username = null
+    this.password = null
+    this.device = null
+    this.storage = null
+    this.session = null
+    this.account = null
 
     this.cookies = []
     this.store = {}
@@ -26,46 +36,33 @@ class Instagram {
   }
 
   login (username, password) {
-    let options = {
-      method: 'GET',
-      uri: this.url,
-      resolveWithFullResponse: true
-    }
     return new Promise((resolve, reject) => {
-      request(options)
-        .then((response) => {
-          this.parseCookies(response.headers['set-cookie'])
-          this.headers['x-instagram-ajax'] = '1'
-          this.headers['x-requested-with'] = 'XMLHttpRequest'
-          this.headers.authority = 'www.instagram.com'
-          options = {
-            method: 'POST',
-            uri: 'https://www.instagram.com/accounts/login/ajax/',
-            gzip: true,
-            resolveWithFullResponse: true,
-            headers: this.headers,
-            form: {
-              'username': username,
-              'password': password
-            }
-          }
-          request(options)
-            .then((response) => {
-              const data = JSON.parse(response.body)
-              if (data.authenticated) {
-                this.parseCookies(response.headers['set-cookie'])
-                this.status.authenticated = true
-                this.status.username = username
-              }
-              return resolve(data)
-            })
-            .catch((error) => {
-              return reject(error)
-            })
-        })
-        .catch((error) => {
-          return reject(error)
-        })
+      this.username = 'kgerrika'
+      this.password = 'Tuputam4dr3'
+      this.device = new Client.Device(this.username)
+      this.storage = new Client.CookieFileStorage(path.resolve() + `/cookies/${this.username}.json`)
+
+      console.log(this.device)
+      console.log(this.storage)
+      console.log(this.username)
+      console.log(this.password)
+      // And go for login
+      let promise = Client.Session.create(this.device, this.storage, this.username, this.password)
+      promise.then((session) => {
+        console.log(session)
+        this.session = session
+        // Now you have a session, we can follow / unfollow, anything...
+        // And we want to follow Instagram official profile
+        return resolve()
+        /* session.getAccount().then((acc) => {
+          console.log(acc)
+          this.account = acc
+          this.status.authenticated = true
+          this.status.username = acc.username
+          console.log('hemen')
+          return resolve(acc)
+        }) */
+      })
     })
   }
 
@@ -121,11 +118,20 @@ class Instagram {
   }
 
   getProfile () {
-    if (this.status.authenticated) {
-      return this.getUserInfo(this.status.username)
-    } else {
-      return null
-    }
+    return new Promise((resolve, reject) => {
+      if (this.status.authenticated) {
+        this.session.getAccount().then((acc) => {
+          console.log(acc)
+          this.account = acc
+          this.status.authenticated = true
+          this.status.username = acc.username
+          console.log('hemen')
+          return resolve(acc)
+        })
+      } else {
+        return resolve('not found')
+      }
+    })
   }
 
   getUserInfo (username) {
