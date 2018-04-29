@@ -1,7 +1,7 @@
 <template>
   <v-layout>
-    <div class="cards" v-if="$store.state.instagram.profile.raw">
-      <instagram-card  :media="media" v-for="(media, index) in $store.state.instagram.profile.raw.media.nodes" :key="index"></instagram-card>
+    <div class="cards" v-if="$store.state.instagram.profileMedia && $store.state.instagram.profileMedia.length > 0">
+      <instagram-card  :media="media" v-for="(media, index) in $store.state.instagram.profileMedia" :key="index"></instagram-card>
     </div>
   </v-layout>
 </template>
@@ -30,7 +30,6 @@
       VLayout,
       InstagramCard
     }
-
   }
 </script>
 <style scoped lang="scss">

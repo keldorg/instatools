@@ -21,6 +21,11 @@ export default new Router({
       component: require('@/pages/LikeUserListFirstPost/Index').default
     },
     {
+      path: '/followers',
+      name: 'followers',
+      component: require('@/pages/Followers/Index').default
+    },
+    {
       path: '*',
       redirect: '/'
     }

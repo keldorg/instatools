@@ -3,9 +3,21 @@
 import path from 'path'
 import mkdirp from 'mkdirp'
 import fs from 'fs'
+import Datastore from 'nedb'
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { likeUserListFirstPost, getUserFollowers } from './logic/instagram'
 import Instagram from './components/Instagram'
+// Type 3: Persistent datastore with automatic loading
+const db = new Datastore({ filename: 'path/to/instatools.db', autoload: true })
+
+/* db.remove({ }, { multi: true }, (err, numRemoved) => {
+  console.log(err)
+  console.log(numRemoved)
+  db.loadDatabase((err) => {
+    // done
+    console.log(err)
+  })
+}) */
 
 var deleteFolderRecursive = function (path) {
   if (fs.existsSync(path)) {
@@ -27,7 +39,7 @@ deleteFolderRecursive(path.resolve() + '/tmp')
 mkdirp.sync(path.resolve() + '/cookies')
 mkdirp.sync(path.resolve() + '/tmp')
 
-const insta = new Instagram()
+const insta = new Instagram(db)
 
 /**
  * Set `__static` path to static files in production
@@ -75,15 +87,35 @@ app.on('activate', () => {
   }
 })
 
-ipcMain.on('hello', function (event) {
-  event.sender.send('say-hi', 'hi')
+ipcMain.on('checkSession', function (event) {
+  insta.checkSession().then((data) => {
+    if (data) {
+      insta.getProfile()
+        .then(profile => {
+          event.sender.send('logged', profile)
+          insta.getUserMediaById(profile.id)
+            .then(media => {
+              event.sender.send('profileMedia', media)
+            })
+        })
+    }
+  }).catch((err) => {
+    console.log(err)
+  })
 })
 
 ipcMain.on('login', function (event, data) {
   insta.login(data.username, data.password).then((data) => {
     insta.getProfile()
       .then(profile => {
+        console.log('perfil')
+        console.log(profile.id)
         event.sender.send('logged', profile)
+        insta.getUserProfileMedia(profile.id)
+          .then(media => {
+            console.log('media')
+            event.sender.send('profileMedia', media)
+          })
       })
   }).catch((err) => {
     console.log(err)
@@ -106,6 +138,31 @@ ipcMain.on('powerFollowers', function (event, data) {
         console.log(err)
       })
   }
+})
+
+ipcMain.on('getFollowers', function (event, id) {
+  console.log('followers')
+  console.log(id)
+  insta.getFollowers(id)
+    .then(followers => {
+      console.log(followers.length)
+      event.sender.send('userFollowers', followers)
+    })
+    .catch((err) => {
+      console.log(err)
+    })
+})
+
+ipcMain.on('getLikers', function (event, id) {
+  console.log('likers')
+  console.log(id)
+  insta.getMediaLikers(id)
+    .then(res => {
+      console.log(res.length)
+    })
+    .catch((err) => {
+      console.log(err)
+    })
 })
 
 /**

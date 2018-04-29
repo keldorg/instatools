@@ -6,7 +6,11 @@
 
 <script>
   export default {
-    name: 'insta-electron'
+    name: 'insta-electron',
+    mounted () {
+      console.log('Checkeando si hay session guardada')
+      this.$electron.ipcRenderer.send('checkSession')
+    }
   }
 </script>
 

@@ -1,11 +1,13 @@
 <template>
   <div class="card">
     <div class="thumbnail">
-      <img :src="media.display_src" alt="media.caption">
+      <img :src="media._params.images[0].url" alt="media.caption">
     </div>
     <div class="card-footer">
-      <div class="likes"><icon name="heart" color="#fb3958"></icon> {{media.likes.count}}</div>
-      <div class="comments"><icon name="comment-o"></icon> {{media.comments.count}}</div>
+      <div class="likes"><icon name="heart" color="#fb3958"></icon> {{media._params.likeCount}}</div>
+      <div class="comments"><icon name="comment-o"></icon> {{media._params.commentCount}}</div>
+      <div class="comments" @click="likers(media._params.id)"><icon name="refresh"></icon></div>
+      <div class="comments"><icon name="comment-o"></icon> {{media.likers.data.length}}</div>
     </div>
   </div>
 </template>
@@ -13,7 +15,12 @@
 <script>
   export default {
     name: 'instagram-card',
-    props: ['media']
+    props: ['media'],
+    methods: {
+      likers (id) {
+        this.$electron.ipcRenderer.send('getLikers', id)
+      }
+    }
   }
 </script>
 

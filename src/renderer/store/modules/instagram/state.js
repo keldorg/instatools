@@ -7,5 +7,7 @@ export default {
     raw: null
   },
   authenticated: false,
-  logs: []
+  logs: [],
+  profileMedia: [],
+  followers: []
 }

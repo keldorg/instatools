@@ -2,7 +2,8 @@ import {
   LOGIN,
   SET_PROFILE,
   ADD_LOG,
-  RESET_LOG
+  RESET_LOG,
+  ADD_PROFILE_MEDIA, ADD_FOLLOWERS
 } from './mutation-types'
 
 export default {
@@ -11,14 +12,24 @@ export default {
   },
 
   [SET_PROFILE] (state, data) {
-    state.profile.username = data.username
-    state.profile.id = data.id
-    state.profile.profileUrl = data.profile_pic_url
-    state.profile.raw = data
+    state.profile.username = data._params.username
+    state.profile.id = data._params.id
+    state.profile.fullName = data._params.fullName
+    state.profile.profileUrl = data._params.profilePicUrl
+    state.profile.raw = data._params
   },
 
   [ADD_LOG] (state, log) {
     state.logs.push(log)
+  },
+
+  [ADD_PROFILE_MEDIA] (state, media) {
+    state.profileMedia = media
+  },
+
+  [ADD_FOLLOWERS] (state, media) {
+    console.log(media[0])
+    state.followers = media
   },
 
   [RESET_LOG] (state, log) {

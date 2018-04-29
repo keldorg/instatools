@@ -4,7 +4,7 @@ import request from 'request-promise'
 let Client = require('instagram-private-api').V1
 
 class Instagram {
-  constructor () {
+  constructor (db) {
     this.url = 'https://www.instagram.com/'
     this.headers = {
       'accept': '*/*',
@@ -20,6 +20,7 @@ class Instagram {
       'x-instagram-ajax': '1',
       'x-requested-with': 'XMLHttpRequest'
     }
+    this.db = db
     this.username = null
     this.password = null
     this.device = null
@@ -37,31 +38,43 @@ class Instagram {
 
   login (username, password) {
     return new Promise((resolve, reject) => {
-      this.username = 'kgerrika'
-      this.password = 'Tuputam4dr3'
+      this.username = username
+      this.password = password
       this.device = new Client.Device(this.username)
       this.storage = new Client.CookieFileStorage(path.resolve() + `/cookies/${this.username}.json`)
 
-      console.log(this.device)
-      console.log(this.storage)
-      console.log(this.username)
-      console.log(this.password)
       // And go for login
       let promise = Client.Session.create(this.device, this.storage, this.username, this.password)
       promise.then((session) => {
-        console.log(session)
         this.session = session
-        // Now you have a session, we can follow / unfollow, anything...
-        // And we want to follow Instagram official profile
+        let userDoc = {
+          type: 'User',
+          username: this.username,
+          password: this.password
+        }
+        this.db.update({ type: 'User' }, userDoc, { upsert: true }, (err, numReplaced, upsert) => {
+          if (err) console.log(err)
+          // numReplaced = 1, upsert = { _id: 'id5', planet: 'Pluton', inhabited: false }
+          // A new document { _id: 'id5', planet: 'Pluton', inhabited: false } has been added to the collection
+        })
         return resolve()
-        /* session.getAccount().then((acc) => {
-          console.log(acc)
-          this.account = acc
-          this.status.authenticated = true
-          this.status.username = acc.username
-          console.log('hemen')
-          return resolve(acc)
-        }) */
+      })
+    })
+  }
+
+  checkSession () {
+    return new Promise((resolve, reject) => {
+      // The same rules apply when you want to only find one document
+      this.db.findOne({ type: 'User' }, (err, doc) => {
+        if (err) console.log(err)
+
+        if (doc && doc.username && doc.password) {
+          this.login(doc.username, doc.password)
+            .then(() => resolve(true))
+            .catch()
+        } else {
+          return resolve(false)
+        }
       })
     })
   }
@@ -87,25 +100,6 @@ class Instagram {
       })
   }
 
-  getFollowers (userId, first = 20, after = '') {
-    const options = {
-      method: 'GET',
-      uri: `https://www.instagram.com/graphql/query/?query_id=17851374694183129&variables={"id":"${userId}","first":${first},"after":"${after}"}`,
-      gzip: true,
-      resolveWithFullResponse: true,
-      headers: this.headers
-    }
-    return request(options)
-      .then((response) => {
-        this.parseCookies(response.headers['set-cookie'])
-        const data = JSON.parse(response.body)
-        return {
-          followers: data.data.user.edge_followed_by.edges.map(elem => elem.node),
-          page_info: data.data.user.edge_followed_by.page_info
-        }
-      })
-  }
-
   getFollowing (userId) {
     return axios({
       method: 'get',
@@ -117,37 +111,139 @@ class Instagram {
       })
   }
 
-  getProfile () {
+  getProfile (username) {
+    return this.session.getAccount(this.session, 'kgerrika').then((acc) => {
+      console.log(acc)
+      console.log('hemen')
+      return acc
+    })
+  }
+
+  getUserProfileMedia (id) {
     return new Promise((resolve, reject) => {
-      if (this.status.authenticated) {
-        this.session.getAccount().then((acc) => {
-          console.log(acc)
-          this.account = acc
-          this.status.authenticated = true
-          this.status.username = acc.username
-          console.log('hemen')
-          return resolve(acc)
+      console.log(id)
+      let feed = new Client.Feed.UserMedia(this.session, id)
+      feed.get().then(function (media) {
+        console.log(media.length)
+        return resolve(media)
+      })
+    })
+  }
+
+  getUserMediaById (id) {
+    let that = this
+    return new Promise((resolve, reject) => {
+      console.log(id)
+      let feed = new Client.Feed.UserMedia(this.session, id)
+      feed.get().then(function (media) {
+        console.log('MEdia: ' + media.length)
+        that.getPhotoData(media, [], function (done) {
+          console.log(done[0])
+          return resolve(done)
         })
-      } else {
-        return resolve('not found')
+        // return resolve(media)
+      })
+    })
+  }
+  getPhotoData (photos, donePhotos, callback) {
+    if (photos.length === 0) {
+      return callback(donePhotos)
+    }
+    let photo = photos.pop()
+    console.log({ type: 'Likers', photo_id: photo.id })
+    this.db.findOne({ type: 'Likers', photo_id: photo.id }, (err, doc) => {
+      if (err) console.log(err)
+      console.log(doc)
+      if (doc) {
+        photo.likers = doc
       }
+      donePhotos.push(photo)
+      this.getPhotoData(photos, donePhotos, callback)
+    })
+  }
+
+  getFollowers (id) {
+    return new Promise((resolve, reject) => {
+      this.db.findOne({ type: 'Followers', user_id: id }, (err, doc) => {
+        if (err) console.log(err)
+
+        if (doc && doc.data && doc.data.length > 0) {
+          console.log(doc.data)
+          return resolve(doc.data)
+        } else {
+          let feed = new Client.Feed.AccountFollowers(this.session, id)
+
+          feed.all().then((data) => {
+            console.log('numero de usuarios')
+            console.log(data.length)
+            console.log(data[0])
+            let followersData = data.map(elem => {
+              return {
+                id: elem.id,
+                username: elem._params.username,
+                fullName: elem._params.fullName,
+                isPrivate: elem._params.isPrivate,
+                profilePicUrl: elem._params.profilePicUrl,
+                profilePicId: elem._params.profilePicId,
+                picture: elem._params.picture}
+            })
+
+            let followersDoc = {
+              type: 'Followers',
+              user_id: id,
+              data: followersData
+            }
+            this.db.update({ type: 'Followers', user_id: id }, followersDoc, { upsert: true }, (err, numReplaced, upsert) => {
+              if (err) console.log(err)
+              // numReplaced = 1, upsert = { _id: 'id5', planet: 'Pluton', inhabited: false }
+              // A new document { _id: 'id5', planet: 'Pluton', inhabited: false } has been added to the collection
+            })
+            return resolve(data)
+          })
+        }
+      })
     })
   }
 
   getUserInfo (username) {
-    const options = {
-      method: 'GET',
-      uri: `https://www.instagram.com/${username}/?__a=1`,
-      gzip: true,
-      resolveWithFullResponse: true,
-      headers: this.headers
-    }
-    return request(options)
-      .then((response) => {
-        const data = JSON.parse(response.body)
-        this.parseCookies(response.headers['set-cookie'])
-        return data.user
+    return Client.Account.searchForUser(this.session, 'username')
+      .then((acc) => {
+        console.log(acc)
+        console.log('hemen')
+        return acc
       })
+  }
+
+  getMediaLikers (id) {
+    return new Promise((resolve, reject) => {
+      console.log(id)
+      console.log('asdf')
+      Client.Media.likers(this.session, id).then(data => {
+        console.log(data.length)
+        console.log(data[0])
+        let likersData = data.map(elem => {
+          return {
+            id: elem.id,
+            username: elem._params.username,
+            fullName: elem._params.fullName,
+            isPrivate: elem._params.isPrivate,
+            profilePicUrl: elem._params.profilePicUrl,
+            profilePicId: elem._params.profilePicId,
+            picture: elem._params.picture}
+        })
+
+        let likersDoc = {
+          type: 'Likers',
+          photo_id: id,
+          data: likersData
+        }
+        this.db.update({ type: 'Likers', photo_id: id }, likersDoc, { upsert: true }, (err, numReplaced, upsert) => {
+          if (err) console.log(err)
+          // numReplaced = 1, upsert = { _id: 'id5', planet: 'Pluton', inhabited: false }
+          // A new document { _id: 'id5', planet: 'Pluton', inhabited: false } has been added to the collection
+        })
+      })
+    })
   }
 
   getPostLikes (shortcode, first = 20, after = '') {

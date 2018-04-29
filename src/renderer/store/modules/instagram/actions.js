@@ -12,8 +12,18 @@ export const addLog = ({ commit }, data) => {
   commit(types.ADD_LOG, data)
 }
 
+export const profileMedia = ({ commit }, data) => {
+  commit(types.ADD_PROFILE_MEDIA, data)
+}
+
+export const setFollowers = ({ commit }, data) => {
+  commit(types.ADD_FOLLOWERS, data)
+}
+
 export default {
   login,
   profile,
-  addLog
+  addLog,
+  profileMedia,
+  setFollowers
 }

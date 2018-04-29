@@ -22,6 +22,16 @@
             Likes
           </a>
         </router-link>
+        <router-link
+            :to="{ name: 'followers' }"
+            active-class="active"
+            class="nav-item"
+            tag="li"
+        >
+          <a class="nav-link">
+            Followers
+          </a>
+        </router-link>
       </ul>
     </div>
   </div>
